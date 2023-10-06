@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -18,7 +19,18 @@ type Service interface {
 }
 
 // Product defines a single product, represented by its unique ID.
-type Product struct{}
+type Product struct {
+	ID          string
+	Name        string
+	Description string
+	Price       Price
+}
+
+type Price float64
+
+func (p Price) String() string {
+	return fmt.Sprintf("%0.2f", p)
+}
 
 // ProductFilter
 type ProductFilter struct{}

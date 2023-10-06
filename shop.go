@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
-	"golang.org/x/exp/slog"
 )
 
 // Service
@@ -20,16 +20,16 @@ type Service interface {
 
 // Product defines a single product, represented by its unique ID.
 type Product struct {
-	ID          string
-	Name        string
-	Description string
-	Price       Price
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Price       Price  `json:"price,omitempty"`
 }
 
 type Price float64
 
 func (p Price) String() string {
-	return fmt.Sprintf("%0.2f", p)
+	return fmt.Sprintf("%.2f", p)
 }
 
 // ProductFilter

@@ -38,7 +38,7 @@ func NewHandler(s Service, l *slog.Logger) *Handler {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/products", h.ListProducts).Methods(http.MethodGet)
+	router.HandleFunc("/products", h.ListProducts()).Methods(http.MethodGet)
 	router.HandleFunc("/products/{productID}", h.GetProduct).Methods(http.MethodGet)
 	h.Handler = router
 
@@ -74,30 +74,33 @@ func (h *Handler) GetProduct(w http.ResponseWriter, r *http.Request) {
 
 // ListProducts returns a subset of products defined by the filters in the URL.
 // GET /products
-func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
-	var f ProductFilter
+func (h *Handler) ListProducts() http.HandlerFunc {
 	decoder := schema.NewDecoder()
 	decoder.IgnoreUnknownKeys(true)
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	if err := decoder.Decode(&f, r.URL.Query()); err != nil {
-		h.logger.Info("failed to decode request", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	products, err := h.service.ListProducts(r.Context(), f)
-	if err != nil {
-		switch {
-		default:
-			h.logger.Info("failed to list products", "error", err)
-			w.WriteHeader(http.StatusInternalServerError)
+		var f ProductFilter
+		if err := decoder.Decode(&f, r.URL.Query()); err != nil {
+			h.logger.Info("failed to decode request", "error", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
-		return
+
+		products, err := h.service.ListProducts(r.Context(), f)
+		if err != nil {
+			switch {
+			default:
+				h.logger.Info("failed to list products", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(products)
+
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(products)
-
 }
 
 var (

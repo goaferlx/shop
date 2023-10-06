@@ -14,8 +14,11 @@ import (
 
 // Service
 type Service interface {
+	CreateProduct(ctx context.Context, p Product) (Product, error)
 	GetProduct(ctx context.Context, id string) (Product, error)
 	ListProducts(ctx context.Context, f ProductFilter) ([]Product, error)
+	UpdateProduct(ctx context.Context, id string, upd ProductUpdate) (Product, error)
+	DeleteProduct(ctx context.Context, id string) error
 }
 
 // Product defines a single product, represented by its unique ID.
@@ -35,6 +38,8 @@ func (p Price) String() string {
 // ProductFilter
 type ProductFilter struct{}
 
+type ProductUpdate struct{}
+
 // Handler
 type Handler struct {
 	service Service
@@ -50,8 +55,11 @@ func NewHandler(s Service, l *slog.Logger) *Handler {
 	}
 
 	router := mux.NewRouter()
+	router.HandleFunc("/products", h.CreateProduct).Methods(http.MethodPost)
 	router.HandleFunc("/products", h.ListProducts()).Methods(http.MethodGet)
 	router.HandleFunc("/products/{productID}", h.GetProduct).Methods(http.MethodGet)
+	router.HandleFunc("/products/{productID}", h.UpdateProduct).Methods(http.MethodPatch)
+	router.HandleFunc("/products/{productID}", h.DeleteProduct).Methods(http.MethodDelete)
 	h.Handler = router
 
 	return &h
@@ -59,6 +67,31 @@ func NewHandler(s Service, l *slog.Logger) *Handler {
 
 func idFromRequest(r *http.Request) string {
 	return mux.Vars(r)["productID"]
+}
+
+// POST /products
+func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
+	var p Product
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	product, err := h.service.CreateProduct(r.Context(), p)
+	if err != nil {
+		switch {
+		default:
+			h.logger.Info("failed to create product", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	url := fmt.Sprintf("/products/%s", product.ID)
+	w.Header().Set("Location", url)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(product)
 }
 
 // GetProduct will parse and respond to an API request for a specific product defined by its {productID} in the request URL.
@@ -113,6 +146,50 @@ func (h *Handler) ListProducts() http.HandlerFunc {
 		json.NewEncoder(w).Encode(products)
 
 	}
+}
+
+// PATCH /products/{productID}
+func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	id := idFromRequest(r)
+
+	var upd ProductUpdate
+	if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	product, err := h.service.UpdateProduct(r.Context(), id, upd)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			h.logger.Info("failed to update product", "id", id, "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(product)
+}
+
+// DELETE /products/{productID}
+func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
+	id := idFromRequest(r)
+
+	if err := h.service.DeleteProduct(r.Context(), id); err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			h.logger.Info("failed to delete product", "id", id, "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 var (

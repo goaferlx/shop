@@ -35,19 +35,20 @@ func (p Price) String() string {
 	return fmt.Sprintf("%.2f", p)
 }
 
-// ProductFilter
+// ProductFilter defines the attributes a user can use to filter/limit a subset of results in a request for a list of products.
 type ProductFilter struct{}
 
+// ProductUpdate defines the attributes that can be updated in a PATCH request.
 type ProductUpdate struct{}
 
-// Handler
+// Handler implements http.Handler and provides an interface for API requests to interact with the ProductService.
 type Handler struct {
 	service Service
 	http.Handler
 	logger *slog.Logger
 }
 
-// NewHandler returns a http.Handler to parse API requests and send JSON responses using data obtained from the underlying Service implementation.
+// NewHandler returns a new Handler.
 func NewHandler(s Service, l *slog.Logger) *Handler {
 	h := Handler{
 		service: s,
@@ -148,6 +149,7 @@ func (h *Handler) ListProducts() http.HandlerFunc {
 	}
 }
 
+// Update a subset of a products attributes.  The product is identified by its {productID} in the URL.
 // PATCH /products/{productID}
 func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	id := idFromRequest(r)
@@ -157,6 +159,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	product, err := h.service.UpdateProduct(r.Context(), id, upd)
 	if err != nil {
 		switch {
@@ -174,6 +177,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(product)
 }
 
+// Delete a product identified in the URL.
 // DELETE /products/{productID}
 func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id := idFromRequest(r)

@@ -81,6 +81,8 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	product, err := h.service.CreateProduct(r.Context(), p)
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrConflict):
+			w.WriteHeader(http.StatusConflict)
 		default:
 			h.logger.Info("failed to create product", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -165,6 +167,8 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ErrNotFound):
 			w.WriteHeader(http.StatusNotFound)
+		case errors.Is(err, ErrConflict):
+			w.WriteHeader(http.StatusConflict)
 		default:
 			h.logger.Info("failed to update product", "id", id, "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -198,4 +202,5 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 var (
 	ErrNotFound = errors.New("shop: not found")
+	ErrConflict = errors.New("shop: conflict on id")
 )
